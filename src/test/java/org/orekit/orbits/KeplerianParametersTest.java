@@ -55,6 +55,41 @@ public class KeplerianParametersTest {
     private double mu;
 
     @Test
+    public void testAcceleration() throws OrekitException {
+        //setup
+        Vector3D p = new Vector3D(6378137 + 300e3, 0, 0);
+        Vector3D v = new Vector3D(0, 7.5e3, 0);
+        Vector3D a = new Vector3D(1, 2, 3);
+        PVCoordinates pva = new PVCoordinates(p, v, a);
+        Frame frame = FramesFactory.getGCRF();
+
+        //action
+        KeplerianOrbit o = new KeplerianOrbit(pva, frame, date, mu);
+
+        //verify
+        // user supplied acceleration is ignored, two body acceleration is used
+        Vector3D expectedA = new Vector3D(-mu/FastMath.pow(p.getX(), 2), 0, 0);
+        Assert.assertEquals(p, o.getPVCoordinates().getPosition());
+        Assert.assertEquals(v, o.getPVCoordinates().getVelocity());
+        Assert.assertEquals(expectedA, o.getPVCoordinates().getAcceleration());
+        Assert.assertEquals(p, o.getPVCoordinates(frame).getPosition());
+        Assert.assertEquals(v, o.getPVCoordinates(frame).getVelocity());
+        Assert.assertEquals(expectedA, o.getPVCoordinates(frame).getAcceleration());
+        Assert.assertEquals(
+                0,
+                p.subtract(o.getPVCoordinates(date, frame).getPosition()).getNorm(),
+                1e-9);
+        Assert.assertEquals(
+                0,
+                v.subtract(o.getPVCoordinates(date, frame).getVelocity()).getNorm(),
+                1e-12);
+        Assert.assertEquals(
+                0,
+                expectedA.subtract(o.getPVCoordinates(date, frame).getAcceleration()).getNorm(),
+                1e-15);
+    }
+
+    @Test
     public void testKeplerianToKeplerian() {
 
         // elliptic orbit

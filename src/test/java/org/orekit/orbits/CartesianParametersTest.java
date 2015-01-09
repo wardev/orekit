@@ -36,10 +36,14 @@ import org.orekit.errors.OrekitException;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.Transform;
+import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.analytical.EcksteinHechlerPropagator;
+import org.orekit.propagation.analytical.KeplerianPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
+import org.orekit.utils.CartesianDerivativesFilter;
 import org.orekit.utils.PVCoordinates;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 
 public class CartesianParametersTest {
@@ -49,6 +53,32 @@ public class CartesianParametersTest {
 
     // Body mu
     private double mu;
+
+    @Test
+    public void testAcceleration() throws OrekitException {
+        //setup
+        Vector3D p = new Vector3D(6378137 + 300e3, 0, 0);
+        Vector3D v = new Vector3D(0, 7.5e3, 0);
+        Vector3D a = new Vector3D(1, 2, 3);
+        PVCoordinates pva = new PVCoordinates(p, v, a);
+        Frame frame = FramesFactory.getGCRF();
+
+        //action
+        CartesianOrbit o = new CartesianOrbit(pva, frame, date, mu);
+
+        //verify
+        // user supplied acceleration is ignored, two body acceleration is used
+        Vector3D expectedA = new Vector3D(-mu/FastMath.pow(p.getX(), 2), 0, 0);
+        Assert.assertEquals(p, o.getPVCoordinates().getPosition());
+        Assert.assertEquals(v, o.getPVCoordinates().getVelocity());
+        Assert.assertEquals(expectedA, o.getPVCoordinates().getAcceleration());
+        Assert.assertEquals(p, o.getPVCoordinates(frame).getPosition());
+        Assert.assertEquals(v, o.getPVCoordinates(frame).getVelocity());
+        Assert.assertEquals(expectedA, o.getPVCoordinates(frame).getAcceleration());
+        Assert.assertEquals(p, o.getPVCoordinates(date, frame).getPosition());
+        Assert.assertEquals(v, o.getPVCoordinates(date, frame).getVelocity());
+        Assert.assertEquals(expectedA, o.getPVCoordinates(date, frame).getAcceleration());
+    }
 
     @Test
     public void testCartesianToCartesian() {
@@ -80,9 +110,9 @@ public class CartesianParametersTest {
         Assert.assertEquals(42255170.0028257,  p.getA(), Utils.epsilonTest * p.getA());
         Assert.assertEquals(0.592732497856475e-03,  p.getEquinoctialEx(), Utils.epsilonE * FastMath.abs(p.getE()));
         Assert.assertEquals(-0.206274396964359e-02, p.getEquinoctialEy(), Utils.epsilonE * FastMath.abs(p.getE()));
-        Assert.assertEquals(FastMath.sqrt(FastMath.pow(0.592732497856475e-03,2)+FastMath.pow(-0.206274396964359e-02,2)), p.getE(), Utils.epsilonAngle * FastMath.abs(p.getE()));
-        Assert.assertEquals(MathUtils.normalizeAngle(2*FastMath.asin(FastMath.sqrt((FastMath.pow(0.128021863908325e-03,2)+FastMath.pow(-0.352136186881817e-02,2))/4.)),p.getI()), p.getI(), Utils.epsilonAngle * FastMath.abs(p.getI()));
-        Assert.assertEquals(MathUtils.normalizeAngle(0.234498139679291e+01,p.getLM()), p.getLM(), Utils.epsilonAngle * FastMath.abs(p.getLM()));
+        Assert.assertEquals(FastMath.sqrt(FastMath.pow(0.592732497856475e-03, 2) + FastMath.pow(-0.206274396964359e-02, 2)), p.getE(), Utils.epsilonAngle * FastMath.abs(p.getE()));
+        Assert.assertEquals(MathUtils.normalizeAngle(2 * FastMath.asin(FastMath.sqrt((FastMath.pow(0.128021863908325e-03, 2) + FastMath.pow(-0.352136186881817e-02, 2)) / 4.)), p.getI()), p.getI(), Utils.epsilonAngle * FastMath.abs(p.getI()));
+        Assert.assertEquals(MathUtils.normalizeAngle(0.234498139679291e+01, p.getLM()), p.getLM(), Utils.epsilonAngle * FastMath.abs(p.getLM()));
     }
 
     @Test
@@ -304,7 +334,64 @@ public class CartesianParametersTest {
     }
 
     @Test
-    public void testInterpolation() throws OrekitException {
+    public void testInterpolationCloseToKeplerian() throws OrekitException {
+
+        final double ehMu  = 3.9860047e14;
+        final double ae  = 6.378137e6;
+        final double c20 = -1.08263e-3;
+        final double c30 = 2.54e-6;
+        final double c40 = 1.62e-6;
+        final double c50 = 2.3e-7;
+        final double c60 = -5.5e-7;
+
+        final AbsoluteDate date = AbsoluteDate.J2000_EPOCH.shiftedBy(584.);
+        final Vector3D position = new Vector3D(3220103., 69623., 6449822.);
+        final Vector3D velocity = new Vector3D(6414.7, -2006., -3180.);
+        final CartesianOrbit initialOrbit = new CartesianOrbit(new PVCoordinates(position, velocity),
+                                                              FramesFactory.getEME2000(), date, ehMu);
+
+        KeplerianPropagator propagator =
+                new KeplerianPropagator(initialOrbit);
+
+        // set up a 5 points sample
+        List<Orbit> sample = new ArrayList<Orbit>();
+        for (double dt = 0; dt < 251.0; dt += 60.0) {
+            sample.add(propagator.propagate(date.shiftedBy(dt)).getOrbit());
+        }
+
+        // well inside the sample, interpolation should be much better than Keplerian shift
+        // this is bacause we take the full non-Keplerian acceleration into account in
+        // the Cartesian parameters, which in this case is preserved by the
+        // Eckstein-Hechler propagator
+        double maxShiftPError = 0;
+        double maxInterpolationPError = 0;
+        double maxShiftVError = 0;
+        double maxInterpolationVError = 0;
+        for (double dt = 0; dt < 240.0; dt += 1.0) {
+            AbsoluteDate t                   = initialOrbit.getDate().shiftedBy(dt);
+            PVCoordinates propagated         = propagator.propagate(t).getPVCoordinates();
+            PVCoordinates shiftError         = new PVCoordinates(propagated,
+                                                                 initialOrbit.getPVCoordinates().shiftedBy(dt));
+            PVCoordinates interpolationError = new PVCoordinates(propagated,
+                                                                 initialOrbit.interpolate(t, sample).getPVCoordinates());
+            maxShiftPError                   = FastMath.max(maxShiftPError,
+                                                            shiftError.getPosition().getNorm());
+            maxInterpolationPError           = FastMath.max(maxInterpolationPError,
+                                                            interpolationError.getPosition().getNorm());
+            maxShiftVError                   = FastMath.max(maxShiftVError,
+                                                            shiftError.getVelocity().getNorm());
+            maxInterpolationVError           = FastMath.max(maxInterpolationVError,
+                                                            interpolationError.getVelocity().getNorm());
+        }
+        Assert.assertTrue(maxShiftPError         > 390.0);
+        Assert.assertTrue(maxInterpolationPError < 3.0e-8);
+        Assert.assertTrue(maxShiftVError         > 3.0);
+        Assert.assertTrue(maxInterpolationVError < 2.0e-9);
+
+    }
+
+    @Test
+    public void testInterpolationCloseToEH() throws OrekitException {
 
         final double ehMu  = 3.9860047e14;
         final double ae  = 6.378137e6;
@@ -354,9 +441,9 @@ public class CartesianParametersTest {
                                                             interpolationError.getVelocity().getNorm());                    
         }
         Assert.assertTrue(maxShiftPError         > 390.0);
-        Assert.assertTrue(maxInterpolationPError < 3.0e-8);
+        Assert.assertTrue(maxInterpolationPError < 3);
         Assert.assertTrue(maxShiftVError         > 3.0);
-        Assert.assertTrue(maxInterpolationVError < 2.0e-9);
+        Assert.assertTrue(maxInterpolationVError < 0.2);
 
         // if we go far past sample end, interpolation becomes worse than Keplerian shift
         maxShiftPError = 0;

@@ -31,6 +31,7 @@ import org.orekit.attitudes.AttitudeProvider;
 import org.orekit.errors.OrekitException;
 import org.orekit.errors.PropagationException;
 import org.orekit.frames.Frame;
+import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.Orbit;
 import org.orekit.propagation.AbstractPropagator;
 import org.orekit.propagation.BoundedPropagator;
@@ -39,6 +40,7 @@ import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventState;
 import org.orekit.propagation.sampling.OrekitStepInterpolator;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.PVCoordinatesProvider;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
@@ -329,7 +331,7 @@ public abstract class AbstractAnalyticalPropagator extends AbstractPropagator {
      * @return extrapolated parameters
      * @exception PropagationException if some parameters are out of bounds
      */
-    protected abstract Orbit propagateOrbit(final AbsoluteDate date)
+    protected abstract TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date)
         throws PropagationException;
 
     /** Propagate an orbit without any fancy features.
@@ -345,14 +347,16 @@ public abstract class AbstractAnalyticalPropagator extends AbstractPropagator {
         try {
 
             // evaluate orbit
-            final Orbit orbit = propagateOrbit(date);
+            final TimeStampedPVCoordinates pva = propagateOrbit(date);
+            final double mu = this.getInitialState().getMu();
+            final Orbit orbit = new CartesianOrbit(pva, this.getFrame(), mu);
 
             // evaluate attitude
             final Attitude attitude =
                 getAttitudeProvider().getAttitude(pvProvider, date, orbit.getFrame());
 
             // build raw state
-            return new SpacecraftState(orbit, attitude, getMass(date));
+            return new SpacecraftState(orbit, pva, attitude, getMass(date));
 
         } catch (OrekitException oe) {
             throw new PropagationException(oe);
@@ -365,7 +369,8 @@ public abstract class AbstractAnalyticalPropagator extends AbstractPropagator {
         /** {@inheritDoc} */
         public TimeStampedPVCoordinates getPVCoordinates(final AbsoluteDate date, final Frame frame)
             throws OrekitException {
-            return propagateOrbit(date).getPVCoordinates(frame);
+            final TimeStampedPVCoordinates pva = propagateOrbit(date);
+            return getFrame().getTransformTo(frame, date).transformPVCoordinates(pva);
         }
 
     }
@@ -405,7 +410,7 @@ public abstract class AbstractAnalyticalPropagator extends AbstractPropagator {
         }
 
         /** {@inheritDoc} */
-        protected Orbit propagateOrbit(final AbsoluteDate target)
+        protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate target)
             throws PropagationException {
             return AbstractAnalyticalPropagator.this.propagateOrbit(target);
         }

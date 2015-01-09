@@ -535,7 +535,7 @@ public class EcksteinHechlerPropagatorTest {
         Vector3D referenceV    = interpolated.getVelocity();
         Vector3D computedA     = sample.get(1).getAcceleration();
         Vector3D referenceA    = interpolated.getAcceleration();
-        final CircularOrbit propagated = (CircularOrbit) OrbitType.CIRCULAR.convertType(propagator.propagateOrbit(target));
+        final CircularOrbit propagated = (CircularOrbit) OrbitType.CIRCULAR.convertType(propagator.propagate(target).getOrbit());
         final CircularOrbit keplerian =
                 new CircularOrbit(propagated.getA(),
                                   propagated.getCircularEx(),
@@ -713,7 +713,7 @@ public class EcksteinHechlerPropagatorTest {
 
         // the osculating parameters recomputed by the default Eckstein-Hechler propagator are quite different
         // from initial orbit
-        CircularOrbit defaultOrbit = (CircularOrbit) OrbitType.CIRCULAR.convertType(defaultEH.propagateOrbit(initial.getDate()));
+        CircularOrbit defaultOrbit = (CircularOrbit) OrbitType.CIRCULAR.convertType(defaultEH.propagate(initial.getDate()).getOrbit());
         Assert.assertEquals(267.4, defaultOrbit.getA() - initial.getA(), 0.1);
 
         // the position on the other hand match perfectly
@@ -741,7 +741,7 @@ public class EcksteinHechlerPropagatorTest {
 
         // the default Eckstein-Hechler propagator did however quite a good job, as it found
         // an orbit close to the best fitting
-        CircularOrbit fittedOrbit  = (CircularOrbit) OrbitType.CIRCULAR.convertType(fittedEH.propagateOrbit(initial.getDate()));
+        CircularOrbit fittedOrbit  = (CircularOrbit) OrbitType.CIRCULAR.convertType(fittedEH.propagate(initial.getDate()).getOrbit());
         Assert.assertEquals(0.623, defaultOrbit.getA() - fittedOrbit.getA(), 0.1);
 
         // the position on the other hand are slightly different

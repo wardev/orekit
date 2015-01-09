@@ -36,11 +36,15 @@ import org.orekit.errors.OrekitMessages;
 import org.orekit.frames.Frame;
 import org.orekit.frames.LOFType;
 import org.orekit.frames.Transform;
+import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.Orbit;
+import org.orekit.orbits.OrbitType;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeInterpolable;
 import org.orekit.time.TimeShiftable;
 import org.orekit.time.TimeStamped;
+import org.orekit.utils.CartesianDerivativesFilter;
+import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedAngularCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
@@ -55,6 +59,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
  * states, which are simply named double arrays which can hold any user-defined
  * data.
  * </p>
+ * <p>
  * <p>
  * The state can be slightly shifted to close dates. This shift is based on
  * a simple keplerian model for orbit, a linear extrapolation for attitude
@@ -85,7 +90,10 @@ public class SpacecraftState
      */
     private static final double DATE_INCONSISTENCY_THRESHOLD = 100e-9;
 
-    /** Orbital state. */
+    /** Spacecraft position, velocity, and acceleration. */
+    private final TimeStampedPVCoordinates pva;
+
+    /** Osculating orbital state. */
     private final Orbit orbit;
 
     /** Attitude. */
@@ -197,7 +205,56 @@ public class SpacecraftState
     public SpacecraftState(final Orbit orbit, final Attitude attitude,
                            final double mass, final Map<String, double[]> additional)
         throws IllegalArgumentException {
+        this(orbit, orbit.getPVCoordinates(), attitude, mass, additional);
+    }
+
+    /** Build a spacecraft state from orbit, attitude provider and mass.
+     *
+     * <p> With this constructor an acceleration different from the two-body acceleration
+     * can be set and is accessible using {@link #getPVCoordinates()} and
+     * {@link #getPVCoordinates(Frame)}. This feature is designed so that a propagator
+     * can return it's computed acceleration to the user.
+     *
+     * @param orbit the osculating two-body orbit
+     * @param pva the instantaneous position, velocity and acceleration. The position and
+     *            velocity must equal {@code orbit.getPVCoordinates()}.
+     * @param attitude attitude
+     * @param mass the mass (kg)
+     * @exception IllegalArgumentException if orbit and attitude dates
+     * or frames are not equal
+     */
+    public SpacecraftState(final Orbit orbit,
+                           final PVCoordinates pva,
+                           final Attitude attitude,
+                           final double mass)
+        throws IllegalArgumentException {
+        this(orbit, pva, attitude, mass, null);
+    }
+
+    /** Build a spacecraft state from orbit, attitude provider and mass.
+     *
+     * <p> With this constructor an acceleration different from the two-body acceleration
+     * can be set and is accessible using {@link #getPVCoordinates()} and
+     * {@link #getPVCoordinates(Frame)}. This feature is designed so that a propagator
+     * can return it's computed acceleration to the user.
+     *
+     * @param orbit the osculating two-body orbit
+     * @param pva the instantaneous position, velocity and acceleration. The position and
+     *            velocity must equal {@code orbit.getPVCoordinates()}.
+     * @param attitude attitude
+     * @param mass the mass (kg)
+     * @param additional additional states (may be null if no additional states are available)
+     * @exception IllegalArgumentException if orbit and attitude dates
+     * or frames are not equal
+     */
+    public SpacecraftState(final Orbit orbit,
+                           final PVCoordinates pva,
+                           final Attitude attitude,
+                           final double mass, final Map<String, double[]> additional)
+        throws IllegalArgumentException {
         checkConsistency(orbit, attitude);
+        //TODO check consistency of pva and orbit
+        this.pva        = new TimeStampedPVCoordinates(orbit.getDate(), pva);
         this.orbit      = orbit;
         this.attitude   = attitude;
         this.mass       = mass;
@@ -313,6 +370,7 @@ public class SpacecraftState
 
         // prepare interpolators
         final List<Orbit> orbits = new ArrayList<Orbit>(sample.size());
+        final List<TimeStampedPVCoordinates> pvas = new ArrayList<TimeStampedPVCoordinates>(sample.size());
         final List<Attitude> attitudes = new ArrayList<Attitude>(sample.size());
         final HermiteInterpolator massInterpolator = new HermiteInterpolator();
         final Map<String, HermiteInterpolator> additionalInterpolators =
@@ -325,6 +383,7 @@ public class SpacecraftState
         for (final SpacecraftState state : sample) {
             final double deltaT = state.getDate().durationFrom(date);
             orbits.add(state.getOrbit());
+            pvas.add(state.getPVCoordinates());
             attitudes.add(state.getAttitude());
             massInterpolator.addSamplePoint(deltaT,
                                             new double[] {
@@ -337,6 +396,8 @@ public class SpacecraftState
 
         // perform interpolations
         final Orbit interpolatedOrbit       = orbit.interpolate(date, orbits);
+        final TimeStampedPVCoordinates interpolatedPVA = TimeStampedPVCoordinates
+                .interpolate(date, CartesianDerivativesFilter.USE_PVA, pvas);
         final Attitude interpolatedAttitude = attitude.interpolate(date, attitudes);
         final double interpolatedMass       = massInterpolator.value(0)[0];
         final Map<String, double[]> interpolatedAdditional;
@@ -350,8 +411,17 @@ public class SpacecraftState
         }
 
         // create the complete interpolated state
-        return new SpacecraftState(interpolatedOrbit, interpolatedAttitude,
-                                   interpolatedMass, interpolatedAdditional);
+        // If the orbit is cartesian, use the interpolated PVA because it may contain the
+        // propagator's acceleration values. Otherwise use the interpolated orbit since
+        // it will probably be smoother.
+        if (this.orbit.getType().equals(OrbitType.CARTESIAN)) {
+            return new SpacecraftState(
+                    new CartesianOrbit(interpolatedPVA, this.orbit.getFrame(), this.orbit.getMu()),
+                    interpolatedPVA, interpolatedAttitude, interpolatedMass, interpolatedAdditional);
+        } else {
+            return new SpacecraftState(interpolatedOrbit, interpolatedAttitude,
+                    interpolatedMass, interpolatedAdditional);
+        }
 
     }
 
@@ -582,7 +652,7 @@ public class SpacecraftState
      * @return pvCoordinates in orbit definition frame
      */
     public TimeStampedPVCoordinates getPVCoordinates() {
-        return orbit.getPVCoordinates();
+        return this.pva;
     }
 
     /** Get the {@link TimeStampedPVCoordinates} in given output frame.
@@ -597,7 +667,8 @@ public class SpacecraftState
      */
     public TimeStampedPVCoordinates getPVCoordinates(final Frame outputFrame)
         throws OrekitException {
-        return orbit.getPVCoordinates(outputFrame);
+        return this.getFrame().getTransformTo(outputFrame, this.getDate())
+                .transformPVCoordinates(this.pva);
     }
 
     /** Get the attitude.

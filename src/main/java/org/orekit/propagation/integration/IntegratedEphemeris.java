@@ -200,9 +200,9 @@ public class IntegratedEphemeris
     }
 
     /** {@inheritDoc} */
-    protected Orbit propagateOrbit(final AbsoluteDate date)
+    protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date)
         throws PropagationException {
-        return basicPropagate(date).getOrbit();
+        return basicPropagate(date).getPVCoordinates();
     }
 
     /** {@inheritDoc} */

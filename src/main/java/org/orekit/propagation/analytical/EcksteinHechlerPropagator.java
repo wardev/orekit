@@ -27,7 +27,6 @@ import org.orekit.errors.OrekitMessages;
 import org.orekit.errors.PropagationException;
 import org.orekit.forces.gravity.potential.UnnormalizedSphericalHarmonicsProvider;
 import org.orekit.forces.gravity.potential.UnnormalizedSphericalHarmonicsProvider.UnnormalizedSphericalHarmonics;
-import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.CircularOrbit;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
@@ -396,12 +395,11 @@ public class EcksteinHechlerPropagator extends AbstractAnalyticalPropagator {
     }
 
     /** {@inheritDoc} */
-    public CartesianOrbit propagateOrbit(final AbsoluteDate date)
+    public TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date)
         throws PropagationException {
         // compute Cartesian parameters, taking derivatives into account
         // to make sure velocity and acceleration are consistent
-        return new CartesianOrbit(toCartesian(date, model.propagateParameters(date)),
-                                  model.mean.getFrame(), mu);
+        return toCartesian(date, model.propagateParameters(date));
     }
 
     /** Local class for Eckstein-Hechler model, with fixed mean parameters. */

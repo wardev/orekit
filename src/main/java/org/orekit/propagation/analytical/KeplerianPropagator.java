@@ -22,6 +22,7 @@ import org.orekit.errors.PropagationException;
 import org.orekit.orbits.Orbit;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 /** Simple keplerian orbit propagator.
  * @see Orbit
@@ -117,7 +118,7 @@ public class KeplerianPropagator extends AbstractAnalyticalPropagator {
     }
 
     /** {@inheritDoc} */
-    protected Orbit propagateOrbit(final AbsoluteDate date)
+    protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date)
         throws PropagationException {
 
         // propagate orbit
@@ -128,7 +129,7 @@ public class KeplerianPropagator extends AbstractAnalyticalPropagator {
             orbit = orbit.shiftedBy(date.durationFrom(orbit.getDate()));
         } while(!date.equals(orbit.getDate()));
 
-        return orbit;
+        return orbit.getPVCoordinates();
 
     }
 

@@ -30,7 +30,6 @@ import org.orekit.errors.OrekitException;
 import org.orekit.errors.OrekitMessages;
 import org.orekit.errors.PropagationException;
 import org.orekit.frames.Frame;
-import org.orekit.orbits.Orbit;
 import org.orekit.propagation.BoundedPropagator;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.time.AbsoluteDate;
@@ -148,8 +147,8 @@ public class Ephemeris extends AbstractAnalyticalPropagator implements BoundedPr
     }
 
     /** {@inheritDoc} */
-    protected Orbit propagateOrbit(final AbsoluteDate date) throws PropagationException {
-        return basicPropagate(date).getOrbit();
+    protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date) throws PropagationException {
+        return basicPropagate(date).getPVCoordinates();
     }
 
     /** {@inheritDoc} */

@@ -31,6 +31,7 @@ import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.analytical.AbstractAnalyticalPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.PVCoordinates;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 
 /** This class provides elements to propagate TLE's.
@@ -179,7 +180,9 @@ public abstract class TLEPropagator extends AbstractAnalyticalPropagator {
         initializeCommons();
         sxpInitialize();
         // set the initial state
-        super.resetInitialState(new SpacecraftState(propagateOrbit(initialTLE.getDate())));
+        final TimeStampedPVCoordinates pva = propagateOrbit(initialTLE.getDate());
+        final Orbit orbit = new CartesianOrbit(pva, teme, TLEConstants.MU);
+        super.resetInitialState(new SpacecraftState(orbit));
     }
 
     /** Selects the extrapolator to use with the selected TLE.
@@ -477,9 +480,9 @@ public abstract class TLEPropagator extends AbstractAnalyticalPropagator {
     }
 
     /** {@inheritDoc} */
-    protected Orbit propagateOrbit(final AbsoluteDate date) throws PropagationException {
+    protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date) throws PropagationException {
         try {
-            return new CartesianOrbit(getPVCoordinates(date), teme, date, TLEConstants.MU);
+            return new TimeStampedPVCoordinates(date, getPVCoordinates(date));
         } catch (OrekitException oe) {
             throw new PropagationException(oe);
         }

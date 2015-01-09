@@ -96,9 +96,9 @@ public class KeplerianPropagatorTest {
         // another way to compute n
         double n = FastMath.sqrt(finalOrbit.getMu()/FastMath.pow(a, 3));
 
-        Assert.assertEquals(n*delta_t,
-                            finalOrbit.getLM() - initialOrbit.getLM(),
-                            Utils.epsilonTest * FastMath.abs(n*delta_t));
+        Assert.assertEquals(MathUtils.normalizeAngle(n*delta_t, 0),
+                            MathUtils.normalizeAngle(finalOrbit.getLM() - initialOrbit.getLM(), 0),
+                            Utils.epsilonTest);
         Assert.assertEquals(MathUtils.normalizeAngle(finalOrbit.getLM(),initialOrbit.getLM()), initialOrbit.getLM(), Utils.epsilonAngle * FastMath.abs(initialOrbit.getLM()));
 
         Assert.assertEquals(finalOrbit.getA(), initialOrbit.getA(), Utils.epsilonTest * initialOrbit.getA());
@@ -131,9 +131,9 @@ public class KeplerianPropagatorTest {
         // another way to compute n
         double n = FastMath.sqrt(finalOrbit.getMu()/FastMath.pow(a, 3));
 
-        Assert.assertEquals(n*delta_t,
-                     finalOrbit.getLM() - initialOrbit.getLM(),
-                     Utils.epsilonTest * FastMath.max(100.,FastMath.abs(n*delta_t)));
+        Assert.assertEquals(MathUtils.normalizeAngle(n*delta_t, 0),
+                     MathUtils.normalizeAngle(finalOrbit.getLM() - initialOrbit.getLM(), 0),
+                     Utils.epsilonTest);
         Assert.assertEquals(MathUtils.normalizeAngle(finalOrbit.getLM(),initialOrbit.getLM()), initialOrbit.getLM(), Utils.epsilonAngle * FastMath.abs(initialOrbit.getLM()));
 
         Assert.assertEquals(finalOrbit.getA(), initialOrbit.getA(), Utils.epsilonTest * initialOrbit.getA());
@@ -172,8 +172,8 @@ public class KeplerianPropagatorTest {
         // another way to compute n
         double n = FastMath.sqrt(finalOrbit.getMu()/FastMath.pow(a, 3));
 
-        Assert.assertEquals(n * delta_t,
-                            finalOrbit.getLM() - initialOrbit.getLM(),
+        Assert.assertEquals(MathUtils.normalizeAngle(n * delta_t, 0),
+                            MathUtils.normalizeAngle(finalOrbit.getLM() - initialOrbit.getLM(), 0),
                             Utils.epsilonAngle);
 
         // computation of M final orbit
@@ -263,8 +263,8 @@ public class KeplerianPropagatorTest {
         // another way to compute n
         double n = FastMath.sqrt(finalOrbit.getMu()/FastMath.pow(a, 3));
 
-        Assert.assertEquals(n * delta_t,
-                     finalOrbit.getLM() - initialOrbit.getLM(),
+        Assert.assertEquals(MathUtils.normalizeAngle(n * delta_t, 0),
+                     MathUtils.normalizeAngle(finalOrbit.getLM() - initialOrbit.getLM(), 0),
                      Utils.epsilonAngle);
 
         // computation of M final orbit

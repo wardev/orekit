@@ -28,6 +28,7 @@ import org.orekit.orbits.Orbit;
 import org.orekit.propagation.Propagator;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 /** Orbit propagator that adapts an underlying propagator, adding {@link
  * DifferentialEffect differential effects}.
@@ -161,9 +162,9 @@ public class AdapterPropagator extends AbstractAnalyticalPropagator {
     }
 
     /** {@inheritDoc} */
-    protected Orbit propagateOrbit(final AbsoluteDate date)
+    protected TimeStampedPVCoordinates propagateOrbit(final AbsoluteDate date)
         throws PropagationException {
-        return basicPropagate(date).getOrbit();
+        return basicPropagate(date).getPVCoordinates();
     }
 
     /** {@inheritDoc}*/
